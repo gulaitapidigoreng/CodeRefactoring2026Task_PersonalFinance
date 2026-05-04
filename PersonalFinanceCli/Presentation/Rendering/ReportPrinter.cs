@@ -32,14 +32,15 @@ public sealed class ReportPrinter
         PrintLimitWithFloorPercent(report.Expense, report.Limit?.Amount, report.Limit?.Currency ?? report.Currency);
 
         var recalculatedCategories = RecalculateCategories(report.Date, report.Currency);
+
         _writer.WriteLine("By category:");
-        foreach (var pair in recalculatedCategories.OrderBy(x => x.Key, StringComparer.Ordinal))
+        foreach (var categoryPair in recalculatedCategories.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
-            _writer.WriteLine($"  {pair.Key}: {FormatMoney(pair.Value, report.Currency)}");
+            _writer.WriteLine($"  {categoryPair.Key}: {FormatMoney(categoryPair.Value, report.Currency)}");
         }
 
         _writer.WriteLine("Cards:");
-        foreach (var card in report.Cards.OrderBy(c => c.CardId))
+        foreach (var card in report.Cards.OrderBy(card => card.CardId))
         {
             var marker = card.IsDefault ? " (default)" : string.Empty;
             _writer.WriteLine($"  {card.CardName}{marker}: {FormatMoney(card.Balance, card.Currency)}");
@@ -49,35 +50,36 @@ public sealed class ReportPrinter
     public void PrintDayUsingRepositories(DateOnly date)
     {
         var cards = _cardRepository.GetAll();
-        var currency = cards.FirstOrDefault(c => c.IsDefault)?.Currency
+        var currency = cards.FirstOrDefault(card => card.IsDefault)?.Currency
             ?? cards.FirstOrDefault()?.Currency
             ?? Currency.RUB;
 
-        var cardIds = cards.Where(c => c.Currency == currency).Select(c => c.Id).ToHashSet();
+        var cardIds = cards.Where(card => card.Currency == currency).Select(card => card.Id).ToHashSet();
         var allTransactions = _transactionRepository.GetAll();
 
         decimal income = 0m;
         decimal expense = 0m;
         var byCategory = new Dictionary<string, decimal>();
 
-        foreach (var t in allTransactions)
+        foreach (var transaction in allTransactions)
         {
-            if (t.Date == date && cardIds.Contains(t.CardId))
+            if (transaction.Date == date && cardIds.Contains(transaction.CardId))
             {
-                if (t.Type == TransactionType.Income)
+                if (transaction.Type == TransactionType.Income)
                 {
-                    income += t.Amount;
+                    income += transaction.Amount;
                 }
                 else
                 {
-                    expense += t.Amount;
-                    if (byCategory.TryGetValue(t.Category, out var prev))
+                    expense += transaction.Amount;
+
+                    if (byCategory.TryGetValue(transaction.Category, out var prev))
                     {
-                        byCategory[t.Category] = prev + t.Amount;
+                        byCategory[transaction.Category] = prev + transaction.Amount;
                     }
                     else
                     {
-                        byCategory[t.Category] = t.Amount;
+                        byCategory[transaction.Category] = transaction.Amount;
                     }
                 }
             }
@@ -91,20 +93,21 @@ public sealed class ReportPrinter
         PrintLimitWithRoundPercent(expense, limit?.Amount, limit?.Currency ?? currency);
 
         _writer.WriteLine("By category:");
-        foreach (var pair in byCategory.OrderBy(x => x.Key, StringComparer.Ordinal))
+        foreach (var categoryPair in byCategory.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
-            _writer.WriteLine($"  {pair.Key}: {pair.Value:F2} {currency}");
+            _writer.WriteLine($"  {categoryPair.Key}: {categoryPair.Value:F2} {currency}");
         }
 
         _writer.WriteLine("Cards:");
-        foreach (var card in cards.OrderBy(c => c.Id))
+        foreach (var card in cards.OrderBy(card => card.Id))
         {
             decimal balance = card.InitialBalance;
-            foreach (var trx in allTransactions)
+
+            foreach (var transaction in allTransactions)
             {
-                if (trx.CardId == card.Id)
+                if (transaction.CardId == card.Id)
                 {
-                    balance = trx.Type == TransactionType.Income ? balance + trx.Amount : balance - trx.Amount;
+                    balance = transaction.Type == TransactionType.Income ? balance + transaction.Amount : balance - transaction.Amount;
                 }
             }
 
@@ -170,23 +173,23 @@ public sealed class ReportPrinter
     private Dictionary<string, decimal> RecalculateCategories(DateOnly date, Currency currency)
     {
         var cards = _cardRepository.GetAll();
-        var cardIds = cards.Where(c => c.Currency == currency).Select(c => c.Id).ToHashSet();
+        var cardIds = cards.Where(card => card.Currency == currency).Select(card => card.Id).ToHashSet();
         var byCategory = new Dictionary<string, decimal>(StringComparer.Ordinal);
 
-        foreach (var trx in _transactionRepository.GetAll())
+        foreach (var transaction in _transactionRepository.GetAll())
         {
-            if (trx.Date != date || trx.Type != TransactionType.Expense || !cardIds.Contains(trx.CardId))
+            if (transaction.Date != date || transaction.Type != TransactionType.Expense || !cardIds.Contains(transaction.CardId))
             {
                 continue;
             }
 
-            if (byCategory.TryGetValue(trx.Category, out var prev))
+            if (byCategory.TryGetValue(transaction.Category, out var prev))
             {
-                byCategory[trx.Category] = prev + trx.Amount;
+                byCategory[transaction.Category] = prev + transaction.Amount;
             }
             else
             {
-                byCategory[trx.Category] = trx.Amount;
+                byCategory[transaction.Category] = transaction.Amount;
             }
         }
 

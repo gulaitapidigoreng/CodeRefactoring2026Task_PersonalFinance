@@ -14,17 +14,17 @@ public sealed class JsonCardRepository : ICardRepository
 
     public IReadOnlyList<Card> GetAll()
     {
-        return _store.Load().Cards.OrderBy(c => c.Id).ToList();
+        return _store.Load().Cards.OrderBy(card => card.Id).ToList();
     }
 
     public Card? GetById(int id)
     {
-        return _store.Load().Cards.FirstOrDefault(c => c.Id == id);
+        return _store.Load().Cards.FirstOrDefault(card => card.Id == id);
     }
 
     public Card? GetDefault()
     {
-        return _store.Load().Cards.FirstOrDefault(c => c.IsDefault);
+        return _store.Load().Cards.FirstOrDefault(card => card.IsDefault);
     }
 
     public Card? GetDefaultByDataStore()
@@ -36,18 +36,20 @@ public sealed class JsonCardRepository : ICardRepository
         }
 
         var id = GuidToCardId(data.DefaultCardId.Value);
-        return data.Cards.FirstOrDefault(c => c.Id == id);
+        return data.Cards.FirstOrDefault(card => card.Id == id);
     }
 
     public Card? GetFirst()
     {
-        return _store.Load().Cards.OrderBy(c => c.Id).FirstOrDefault();
+        return _store.Load().Cards.OrderBy(card => card.Id).FirstOrDefault();
     }
 
     public Card Add(Card card)
     {
         var data = _store.Load();
-        card.Id = data.Cards.Count == 0 ? 1 : data.Cards.Max(c => c.Id) + 1;
+
+        card.Id = data.Cards.Count == 0 ? 1 : data.Cards.Max(card => card.Id) + 1;
+
         if (data.Cards.Count == 0)
         {
             card.IsDefault = true;

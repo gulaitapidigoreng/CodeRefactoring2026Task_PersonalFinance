@@ -23,44 +23,46 @@ public sealed class DailyReportService
     public DailyReport Generate(DateOnly date)
     {
         var cards = _cardRepository.GetAll();
-        var currency = cards.FirstOrDefault(c => c.IsDefault)?.Currency
+        var currency = cards.FirstOrDefault(card => card.IsDefault)?.Currency
             ?? cards.FirstOrDefault()?.Currency
             ?? Currency.RUB;
 
-        var cardIds = cards.Where(c => c.Currency == currency).Select(c => c.Id).ToHashSet();
+        var cardIds = cards.Where(card => card.Currency == currency).Select(card => card.Id).ToHashSet();
         var allTransactions = _transactionRepository.GetAll();
 
         decimal income = 0m;
         decimal expense = 0m;
         var categoryTotals = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var t in allTransactions)
+        foreach (var transaction in allTransactions)
         {
-            if (!cardIds.Contains(t.CardId) || t.Date != date)
+            if (!cardIds.Contains(transaction.CardId) || transaction.Date != date)
             {
                 continue;
             }
 
-            if (t.Type == TransactionType.Income)
+            if (transaction.Type == TransactionType.Income)
             {
-                income += t.Amount;
+                income += transaction.Amount;
             }
             else
             {
-                expense += t.Amount;
-                if (categoryTotals.ContainsKey(t.Category))
+                expense += transaction.Amount;
+
+                if (categoryTotals.ContainsKey(transaction.Category))
                 {
-                    categoryTotals[t.Category] += t.Amount;
+                    categoryTotals[transaction.Category] += transaction.Amount;
                 }
                 else
                 {
-                    categoryTotals[t.Category] = t.Amount;
+                    categoryTotals[transaction.Category] = transaction.Amount;
                 }
             }
         }
 
         var limit = _limitRepository.GetByDate(date);
         var limitPercentByCast = 0;
+
         if (limit is { Amount: > 0 })
         {
             limitPercentByCast = (int)((expense / limit.Amount) * 100m);
@@ -72,18 +74,20 @@ public sealed class DailyReportService
         }
 
         var balances = new List<CardBalanceLine>();
+
         foreach (var card in cards)
         {
             decimal balance = card.InitialBalance;
-            foreach (var trx in allTransactions.Where(x => x.CardId == card.Id))
+
+            foreach (var transaction in allTransactions.Where(transaction => transaction.CardId == card.Id))
             {
-                if (trx.Type == TransactionType.Income)
+                if (transaction.Type == TransactionType.Income)
                 {
-                    balance += trx.Amount;
+                    balance += transaction.Amount;
                 }
                 else
                 {
-                    balance -= trx.Amount;
+                    balance -= transaction.Amount;
                 }
             }
 
