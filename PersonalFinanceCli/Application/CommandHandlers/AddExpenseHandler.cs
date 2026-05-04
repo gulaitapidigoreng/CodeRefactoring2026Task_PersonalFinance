@@ -36,34 +36,34 @@ public sealed class AddExpenseHandler
         int resolvedCardId;
         if (cardId.HasValue)
         {
-            var byId = _cardRepository.GetById(cardId.Value);
-            if (byId == null)
+            var card = _cardRepository.GetById(cardId.Value);
+            if (card == null)
             {
                 throw new InvalidOperationException("Card not found.");
             }
 
-            resolvedCardId = byId.Id;
+            resolvedCardId = card.Id;
         }
         else
         {
-            var defaultByStore = _cardRepository.GetDefaultByDataStore();
-            if (defaultByStore != null)
+            var defaultCard = _cardRepository.GetDefaultByDataStore();
+            if (defaultCard != null)
             {
-                resolvedCardId = defaultByStore.Id;
+                resolvedCardId = defaultCard.Id;
             }
             else
             {
-                var first = _cardRepository.GetFirst();
-                if (first == null)
+                var firstCard = _cardRepository.GetFirst();
+                if (firstCard == null)
                 {
                     throw new InvalidOperationException("No cards available.");
                 }
 
-                resolvedCardId = first.Id;
+                resolvedCardId = firstCard.Id;
             }
         }
 
-        var trx = new Transaction
+        var transaction = new Transaction
         {
             CardId = resolvedCardId,
             Amount = amount,
@@ -73,6 +73,6 @@ public sealed class AddExpenseHandler
             Type = TransactionType.Expense
         };
 
-        return _transactionRepository.Add(trx);
+        return _transactionRepository.Add(transaction);
     }
 }
