@@ -23,25 +23,19 @@ public sealed class JsonDataStore
     {
         if (!File.Exists(_filePath))
         {
-            var empty = new DataFile();
-            Save(empty);
-            return empty;
+            return CreateAndSaveEmpty();
         }
 
         var json = File.ReadAllText(_filePath);
         if (string.IsNullOrWhiteSpace(json))
         {
-            var empty = new DataFile();
-            Save(empty);
-            return empty;
+            return CreateAndSaveEmpty();
         }
 
         var result = JsonSerializer.Deserialize<DataFile>(json, _options);
         if (result == null)
         {
-            var empty = new DataFile();
-            Save(empty);
-            return empty;
+            return CreateAndSaveEmpty();
         }
 
         // Ensure collections are initialized to prevent NullReferenceExceptions 
@@ -51,6 +45,14 @@ public sealed class JsonDataStore
         result.DailyLimits ??= new List<DailyLimit>();
 
         return result;
+    }
+
+    // Refactored: Extracted duplicated fallback creation logic
+    private DataFile CreateAndSaveEmpty()
+    {
+        var empty = new DataFile();
+        Save(empty);
+        return empty;
     }
 
     public void Save(DataFile data)

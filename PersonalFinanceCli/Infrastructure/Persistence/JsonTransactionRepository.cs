@@ -3,13 +3,10 @@ using PersonalFinanceCli.Domain.Entities;
 
 namespace PersonalFinanceCli.Infrastructure.Persistence;
 
-public sealed class JsonTransactionRepository : ITransactionRepository
+public sealed class JsonTransactionRepository : JsonRepositoryBase, ITransactionRepository
 {
-    private readonly JsonDataStore _store;
-
-    public JsonTransactionRepository(JsonDataStore store)
+    public JsonTransactionRepository(JsonDataStore store) : base(store)
     {
-        _store = store;
     }
 
     public IReadOnlyList<Transaction> GetAll()
@@ -20,7 +17,7 @@ public sealed class JsonTransactionRepository : ITransactionRepository
     public Transaction Add(Transaction transaction)
     {
         var data = _store.Load();
-        transaction.Id = data.Transactions.Count == 0 ? 1 : data.Transactions.Max(t => t.Id) + 1;
+        transaction.Id = GenerateNextId(data.Transactions);
         data.Transactions.Add(transaction);
         _store.Save(data);
         return transaction;

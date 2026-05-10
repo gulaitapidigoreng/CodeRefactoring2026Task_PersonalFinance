@@ -3,13 +3,10 @@ using PersonalFinanceCli.Domain.Entities;
 
 namespace PersonalFinanceCli.Infrastructure.Persistence;
 
-public sealed class JsonCardRepository : ICardRepository
+public sealed class JsonCardRepository : JsonRepositoryBase, ICardRepository
 {
-    private readonly JsonDataStore _store;
-
-    public JsonCardRepository(JsonDataStore store)
+    public JsonCardRepository(JsonDataStore store) : base(store)
     {
-        _store = store;
     }
 
     public IReadOnlyList<Card> GetAll()
@@ -48,7 +45,7 @@ public sealed class JsonCardRepository : ICardRepository
     {
         var data = _store.Load();
 
-        card.Id = data.Cards.Count == 0 ? 1 : data.Cards.Max(card => card.Id) + 1;
+        card.Id = GenerateNextId(data.Cards);
 
         if (data.Cards.Count == 0)
         {

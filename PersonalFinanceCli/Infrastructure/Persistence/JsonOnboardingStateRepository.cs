@@ -2,13 +2,10 @@ using PersonalFinanceCli.Application.Repositories;
 
 namespace PersonalFinanceCli.Infrastructure.Persistence;
 
-public sealed class JsonOnboardingStateRepository : IOnboardingStateRepository
+public sealed class JsonOnboardingStateRepository : JsonRepositoryBase, IOnboardingStateRepository
 {
-    private readonly JsonDataStore _store;
-
-    public JsonOnboardingStateRepository(JsonDataStore store)
+    public JsonOnboardingStateRepository(JsonDataStore store) : base(store)
     {
-        _store = store;
     }
 
     public DateOnly? GetLastCushionDeclinedDate()
