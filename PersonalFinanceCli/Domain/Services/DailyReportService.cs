@@ -48,15 +48,7 @@ public sealed class DailyReportService
             else
             {
                 expense += transaction.Amount;
-
-                if (categoryTotals.ContainsKey(transaction.Category))
-                {
-                    categoryTotals[transaction.Category] += transaction.Amount;
-                }
-                else
-                {
-                    categoryTotals[transaction.Category] = transaction.Amount;
-                }
+                AccumulateCategoryExpense(categoryTotals, transaction.Category, transaction.Amount);
             }
         }
 
@@ -77,24 +69,42 @@ public sealed class DailyReportService
 
         foreach (var card in cards)
         {
-            decimal balance = card.InitialBalance;
-
-            foreach (var transaction in allTransactions.Where(transaction => transaction.CardId == card.Id))
-            {
-                if (transaction.Type == TransactionType.Income)
-                {
-                    balance += transaction.Amount;
-                }
-                else
-                {
-                    balance -= transaction.Amount;
-                }
-            }
+            var cardTransactions = allTransactions.Where(t => t.CardId == card.Id);
+            var balance = CalculateCardBalance(card.InitialBalance, cardTransactions);
 
             balances.Add(new CardBalanceLine(card.Id, card.Name, card.IsDefault, balance, card.Currency));
         }
 
         return new DailyReport(date, currency, income, expense, categoryTotals, balances, limit);
+    }
+
+    private static void AccumulateCategoryExpense(Dictionary<string, decimal> categoryTotals, string category, decimal amount)
+    {
+        if (categoryTotals.ContainsKey(category))
+        {
+            categoryTotals[category] += amount;
+        }
+        else
+        {
+            categoryTotals[category] = amount;
+        }
+    }
+
+    private static decimal CalculateCardBalance(decimal initialBalance, IEnumerable<Transaction> transactions)
+    {
+        var balance = initialBalance;
+        foreach (var transaction in transactions)
+        {
+            if (transaction.Type == TransactionType.Income)
+            {
+                balance += transaction.Amount;
+            }
+            else
+            {
+                balance -= transaction.Amount;
+            }
+        }
+        return balance;
     }
 }
 
