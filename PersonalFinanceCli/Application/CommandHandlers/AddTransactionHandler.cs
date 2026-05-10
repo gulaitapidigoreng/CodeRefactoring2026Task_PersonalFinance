@@ -1,4 +1,5 @@
 using PersonalFinanceCli.Application.Repositories;
+using PersonalFinanceCli.Application.Services;
 using PersonalFinanceCli.Domain.Entities;
 using PersonalFinanceCli.Domain.ValueObjects;
 using PersonalFinanceCli.Infrastructure.Time;
@@ -7,9 +8,6 @@ namespace PersonalFinanceCli.Application.CommandHandlers;
 
 public sealed class AddTransactionHandler
 {
-    public const string TransferToCushion = "Transfer to cushion";
-    public const string TransferFromIncome = "Transfer from income";
-
     private readonly ITransactionRepository _transactionRepository;
     private readonly ICardRepository _cardRepository;
     private readonly IClock _clock;
@@ -24,13 +22,7 @@ public sealed class AddTransactionHandler
         _clock = clock;
     }
 
-    public Transaction Handle(
-        TransactionType type,
-        decimal amount,
-        string category,
-        int? cardId,
-        DateOnly? date,
-        string? note)
+    public Transaction Handle(TransactionType type, decimal amount, string category, int? cardId, DateOnly? date, string? note)
     {
         if (amount <= 0)
         {
@@ -113,19 +105,6 @@ public sealed class AddTransactionHandler
         return EnsureCardSelectedFallback(cardId, TransactionType.Income);
     }
 
-    public Card? FindCushionCardLoose()
-    {
-        var cards = _cardRepository.GetAll();
-
-        var byFlag = cards.FirstOrDefault(c => c.IsCushion);
-        if (byFlag != null) return byFlag;
-
-        var exact = cards.FirstOrDefault(c => c.Name == "Financial cushion");
-        if (exact != null) return exact;
-
-        return cards.FirstOrDefault(c => c.Name.Contains("cushion", StringComparison.OrdinalIgnoreCase));
-    }
-
     public void AddTransferPair(int fromCardId, int cushionCardId, decimal amount, DateOnly? date)
     {
         var transferDate = date ?? _clock.Today;
@@ -134,7 +113,7 @@ public sealed class AddTransactionHandler
         {
             CardId = fromCardId,
             Amount = amount,
-            Category = TransferToCushion,
+            Category = CushionService.TransferToCushionCategory,
             Date = transferDate,
             Note = "auto",
             Type = TransactionType.Expense
@@ -144,7 +123,7 @@ public sealed class AddTransactionHandler
         {
             CardId = cushionCardId,
             Amount = amount,
-            Category = TransferFromIncome,
+            Category = CushionService.TransferFromIncomeCategory,
             Date = transferDate,
             Note = "auto",
             Type = TransactionType.Income

@@ -16,21 +16,22 @@ public sealed class CushionService
         _cardRepository = cardRepository;
     }
 
-    public Card? FindCushionByName()
+    public Card? GetCushionCard()
     {
         var cards = _cardRepository.GetAll();
-        return cards.FirstOrDefault(card => card.Name == "Financial cushion");
-    }
 
-    public Card? FindCushionByContains()
-    {
-        var cards = _cardRepository.GetAll();
+        var byFlag = cards.FirstOrDefault(card => card.IsCushion);
+        if (byFlag != null) return byFlag;
+
+        var exact = cards.FirstOrDefault(card => card.Name == "Financial cushion");
+        if (exact != null) return exact;
+
         return cards.FirstOrDefault(card => card.Name.Contains("cushion", StringComparison.OrdinalIgnoreCase));
     }
 
     public Card CreateCushion(Currency currency)
     {
-        var existingCushion = FindCushionByName();
+        var existingCushion = GetCushionCard();
         if (existingCushion != null)
         {
             return existingCushion;
