@@ -29,7 +29,9 @@ public sealed class ReportPrinter
         _writer.WriteLine($"Date: {report.Date:yyyy-MM-dd}");
         _writer.WriteLine($"Income: {FormatMoney(report.Income, report.Currency)}");
         _writer.WriteLine($"Expense: {FormatMoney(report.Expense, report.Currency)}");
-        PrintLimitWithFloorPercent(report.Expense, report.Limit?.Amount, report.Limit?.Currency ?? report.Currency);
+
+        // Refactored call
+        PrintLimitFormatted(report.Expense, report.Limit?.Amount, report.Limit?.Currency ?? report.Currency, useFloor: true);
 
         var recalculatedCategories = RecalculateCategories(report.Date, report.Currency);
 
@@ -90,7 +92,9 @@ public sealed class ReportPrinter
         _writer.WriteLine($"Date: {date:yyyy-MM-dd}");
         _writer.WriteLine($"Income: {income:F2} {currency}");
         _writer.WriteLine($"Expense: {expense:F2} {currency}");
-        PrintLimitWithRoundPercent(expense, limit?.Amount, limit?.Currency ?? currency);
+
+        // Refactored call
+        PrintLimitFormatted(expense, limit?.Amount, limit?.Currency ?? currency, useFloor: false);
 
         _writer.WriteLine("By category:");
         foreach (var categoryPair in byCategory.OrderBy(pair => pair.Key, StringComparer.Ordinal))
@@ -116,62 +120,31 @@ public sealed class ReportPrinter
         }
     }
 
-    private void PrintLimit(decimal expense, decimal? limit, Currency currency)
+    // Refactored: Consolidated identical limit printing logic
+    private void PrintLimitFormatted(decimal expense, decimal? limit, Currency currency, bool useFloor)
     {
-        if (limit.HasValue)
+        if (!limit.HasValue || limit.Value <= 0)
         {
-            if (limit.Value <= 0)
-            {
-                _writer.WriteLine("Limit: (not set)");
-                return;
-            }
-
-            var percent = limit.Value == 0m ? 0 : (int)Math.Round((expense / limit.Value) * 100m, MidpointRounding.AwayFromZero);
-            _writer.WriteLine($"Limit: {limit.Value:F2} {currency} ({percent}%)");
+            _writer.WriteLine("Limit: (not set)");
             return;
         }
 
-        _writer.WriteLine("Limit: (not set)");
-    }
-
-    private void PrintLimitWithFloorPercent(decimal expense, decimal? limit, Currency currency)
-    {
-        if (limit.HasValue)
+        int percent;
+        if (useFloor)
         {
-            if (limit.Value <= 0)
-            {
-                _writer.WriteLine("Limit: (not set)");
-                return;
-            }
-
-            var percent = (int)Math.Floor((expense / limit.Value) * 100m);
-            _writer.WriteLine($"Limit: {FormatMoney(limit.Value, currency)} ({percent}%)");
-            return;
+            percent = (int)Math.Floor((expense / limit.Value) * 100m);
+        }
+        else
+        {
+            percent = limit.Value == 0m ? 0 : (int)Math.Round((expense / limit.Value) * 100m, MidpointRounding.AwayFromZero);
         }
 
-        _writer.WriteLine("Limit: (not set)");
-    }
-
-    private void PrintLimitWithRoundPercent(decimal expense, decimal? limit, Currency currency)
-    {
-        if (limit.HasValue)
-        {
-            if (limit.Value <= 0)
-            {
-                _writer.WriteLine("Limit: (not set)");
-                return;
-            }
-
-            var percent = limit.Value == 0m ? 0 : (int)Math.Round((expense / limit.Value) * 100m, MidpointRounding.AwayFromZero);
-            _writer.WriteLine($"Limit: {limit.Value:F2} {currency} ({percent}%)");
-            return;
-        }
-
-        _writer.WriteLine("Limit: (not set)");
+        _writer.WriteLine($"Limit: {FormatMoney(limit.Value, currency)} ({percent}%)");
     }
 
     private Dictionary<string, decimal> RecalculateCategories(DateOnly date, Currency currency)
     {
+        // ... (Remains the same) ...
         var cards = _cardRepository.GetAll();
         var cardIds = cards.Where(card => card.Currency == currency).Select(card => card.Id).ToHashSet();
         var byCategory = new Dictionary<string, decimal>(StringComparer.Ordinal);
