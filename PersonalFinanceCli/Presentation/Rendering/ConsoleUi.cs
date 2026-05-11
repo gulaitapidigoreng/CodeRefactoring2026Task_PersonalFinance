@@ -137,9 +137,7 @@ public sealed class ConsoleUi
         _onboardingChecked = true;
 
         var hasSeen = _onboardingStateRepository.GetHasSeenOnboarding();
-        var cushion = _cushionService.FindCushionByName()
-            ?? _addTransactionHandler.FindCushionCardLoose()
-            ?? _cushionService.FindCushionByContains();
+        var cushion = _cushionService.GetCushionCard();
         if (cushion != null)
         {
             _onboardingStateRepository.SetLastCushionDeclinedDate(null);
@@ -210,14 +208,12 @@ public sealed class ConsoleUi
         return false;
     }
 
-    private void HandleCardAddWizard(IReadOnlyList<string> tokens)
+    // Refactored: Execute Around Pattern to deduplicate try-catch blocks
+    private void ExecuteWizardFlow(Action wizardAction)
     {
         try
         {
-            var name = AskRequiredText(tokens.Count >= 3 ? tokens[2] : null, "Card name?");
-            var currency = AskCurrency(tokens.Count >= 4 ? tokens[3] : null);
-            var initialBalance = AskOptionalDecimal(tokens.Count >= 5 ? tokens[4] : null, "Initial balance? (enter = 0)");
-            ExecuteParsedCommand(new CardAddCommand(name, currency, initialBalance));
+            wizardAction();
         }
         catch (WizardCancelledException)
         {
@@ -230,9 +226,20 @@ public sealed class ConsoleUi
         }
     }
 
+    private void HandleCardAddWizard(IReadOnlyList<string> tokens)
+    {
+        ExecuteWizardFlow(() =>
+        {
+            var name = AskRequiredText(tokens.Count >= 3 ? tokens[2] : null, "Card name?");
+            var currency = AskCurrency(tokens.Count >= 4 ? tokens[3] : null);
+            var initialBalance = AskOptionalDecimal(tokens.Count >= 5 ? tokens[4] : null, "Initial balance? (enter = 0)");
+            ExecuteParsedCommand(new CardAddCommand(name, currency, initialBalance));
+        });
+    }
+
     private void HandleExpenseAddWizard(IReadOnlyList<string> tokens)
     {
-        try
+        ExecuteWizardFlow(() =>
         {
             var amount = AskRequiredDecimal(tokens.Count >= 3 ? tokens[2] : null, "Amount?");
 
@@ -260,21 +267,12 @@ public sealed class ConsoleUi
 
             var dailyReport = _dailyReportService.Generate(_clock.Today);
             _reportPrinter.Print(dailyReport);
-        }
-        catch (WizardCancelledException)
-        {
-            _console.WriteLine("Cancelled.");
-        }
-        catch (Exception ex)
-        {
-            _console.WriteLine($"Error: {ex.Message}");
-            _console.WriteLine("type help");
-        }
+        });
     }
 
     private void HandleIncomeAddWizard(IReadOnlyList<string> tokens)
     {
-        try
+        ExecuteWizardFlow(() =>
         {
             var amount = AskRequiredDecimal(tokens.Count >= 3 ? tokens[2] : null, "Amount?");
 
@@ -305,34 +303,16 @@ public sealed class ConsoleUi
 
             var dailyReport = _dailyReportService.Generate(_clock.Today);
             _reportPrinter.Print(dailyReport);
-        }
-        catch (WizardCancelledException)
-        {
-            _console.WriteLine("Cancelled.");
-        }
-        catch (Exception ex)
-        {
-            _console.WriteLine($"Error: {ex.Message}");
-            _console.WriteLine("type help");
-        }
+        });
     }
 
     private void HandleLimitSetWizard(IReadOnlyList<string> tokens)
     {
-        try
+        ExecuteWizardFlow(() =>
         {
             var amount = AskRequiredDecimal(tokens.Count >= 3 ? tokens[2] : null, "Daily limit amount?");
             ExecuteParsedCommand(new LimitSetCommand(amount));
-        }
-        catch (WizardCancelledException)
-        {
-            _console.WriteLine("Cancelled.");
-        }
-        catch (Exception ex)
-        {
-            _console.WriteLine($"Error: {ex.Message}");
-            _console.WriteLine("type help");
-        }
+        });
     }
 
     private void HandleOptionalCushionTransfer(decimal incomeAmount, string category, int sourceCardId, DateOnly? date)
@@ -348,9 +328,7 @@ public sealed class ConsoleUi
             return;
         }
 
-        var cushion = _cushionService.FindCushionByName()
-            ?? _addTransactionHandler.FindCushionCardLoose()
-            ?? _cushionService.FindCushionByContains();
+        var cushion = _cushionService.GetCushionCard();
 
         if (cushion == null)
         {
@@ -436,124 +414,37 @@ public sealed class ConsoleUi
         }
     }
 
-    private bool AskYesNo(string prompt)
-    {
-        while (true)
-        {
-            _console.Write($"{prompt} ");
-            var raw = _console.ReadLine();
-            if (raw == null)
-            {
-                return false;
-            }
+    // Refactored: Consolidated identical Yes/No prompt loops into a single parameterized method
+    private bool AskYesNo(string prompt) => AskBooleanInternal(prompt, null, out _);
+    private bool AskYesNoDefaultYes(string prompt) => AskBooleanInternal(prompt, true, out _);
+    private bool AskYesNoDefaultNo(string prompt) => AskBooleanInternal(prompt, false, out _);
+    private bool AskYesNoWithCancel(string prompt, out bool canceled) => AskBooleanInternal(prompt, null, out canceled);
 
-            var value = raw.Trim();
-            if (value.Equals("y", StringComparison.OrdinalIgnoreCase) || value.Equals("yes", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            if (value.Equals("n", StringComparison.OrdinalIgnoreCase) || value.Equals("no", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            _console.WriteLine("Error: Please answer y/n.");
-        }
-    }
-
-    private bool AskYesNoDefaultYes(string prompt)
-    {
-        while (true)
-        {
-            _console.Write($"{prompt} ");
-            var raw = _console.ReadLine();
-            if (raw == null)
-            {
-                return false;
-            }
-
-            var value = raw.Trim();
-            if (value.Length == 0)
-            {
-                return true;
-            }
-
-            if (value.Equals("y", StringComparison.OrdinalIgnoreCase) || value.Equals("yes", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            if (value.Equals("n", StringComparison.OrdinalIgnoreCase) || value.Equals("no", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            _console.WriteLine("Error: Please answer y/n.");
-        }
-    }
-
-    private bool AskYesNoDefaultNo(string prompt)
-    {
-        while (true)
-        {
-            _console.Write($"{prompt} ");
-            var raw = _console.ReadLine();
-            if (raw == null)
-            {
-                return false;
-            }
-
-            var value = raw.Trim();
-            if (value.Length == 0)
-            {
-                return false;
-            }
-
-            if (value.Equals("y", StringComparison.OrdinalIgnoreCase) || value.Equals("yes", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            if (value.Equals("n", StringComparison.OrdinalIgnoreCase) || value.Equals("no", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            _console.WriteLine("Error: Please answer y/n.");
-        }
-    }
-
-    private bool AskYesNoWithCancel(string prompt, out bool canceled)
+    private bool AskBooleanInternal(string prompt, bool? defaultValue, out bool canceled)
     {
         canceled = false;
         while (true)
         {
             _console.Write($"{prompt} ");
-            var raw = _console.ReadLine();
-            if (raw == null)
-            {
-                return false;
-            }
+            var raw = _console.ReadLine()?.Trim();
 
-            var value = raw.Trim();
-            if (value.Equals("cancel", StringComparison.OrdinalIgnoreCase))
+            if (raw == null || raw.Equals("cancel", StringComparison.OrdinalIgnoreCase))
             {
                 canceled = true;
                 return false;
             }
 
-            if (value.Length == 0)
+            if (raw.Length == 0 && defaultValue.HasValue)
             {
-                return false;
+                return defaultValue.Value;
             }
 
-            if (value.Equals("y", StringComparison.OrdinalIgnoreCase) || value.Equals("yes", StringComparison.OrdinalIgnoreCase))
+            if (raw.Equals("y", StringComparison.OrdinalIgnoreCase) || raw.Equals("yes", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
-            if (value.Equals("n", StringComparison.OrdinalIgnoreCase) || value.Equals("no", StringComparison.OrdinalIgnoreCase))
+            if (raw.Equals("n", StringComparison.OrdinalIgnoreCase) || raw.Equals("no", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }

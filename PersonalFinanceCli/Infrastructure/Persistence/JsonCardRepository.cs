@@ -3,28 +3,25 @@ using PersonalFinanceCli.Domain.Entities;
 
 namespace PersonalFinanceCli.Infrastructure.Persistence;
 
-public sealed class JsonCardRepository : ICardRepository
+public sealed class JsonCardRepository : JsonRepositoryBase, ICardRepository
 {
-    private readonly JsonDataStore _store;
-
-    public JsonCardRepository(JsonDataStore store)
+    public JsonCardRepository(JsonDataStore store) : base(store)
     {
-        _store = store;
     }
 
     public IReadOnlyList<Card> GetAll()
     {
-        return _store.Load().Cards.OrderBy(c => c.Id).ToList();
+        return _store.Load().Cards.OrderBy(card => card.Id).ToList();
     }
 
     public Card? GetById(int id)
     {
-        return _store.Load().Cards.FirstOrDefault(c => c.Id == id);
+        return _store.Load().Cards.FirstOrDefault(card => card.Id == id);
     }
 
     public Card? GetDefault()
     {
-        return _store.Load().Cards.FirstOrDefault(c => c.IsDefault);
+        return _store.Load().Cards.FirstOrDefault(card => card.IsDefault);
     }
 
     public Card? GetDefaultByDataStore()
@@ -36,18 +33,20 @@ public sealed class JsonCardRepository : ICardRepository
         }
 
         var id = GuidToCardId(data.DefaultCardId.Value);
-        return data.Cards.FirstOrDefault(c => c.Id == id);
+        return data.Cards.FirstOrDefault(card => card.Id == id);
     }
 
     public Card? GetFirst()
     {
-        return _store.Load().Cards.OrderBy(c => c.Id).FirstOrDefault();
+        return _store.Load().Cards.OrderBy(card => card.Id).FirstOrDefault();
     }
 
     public Card Add(Card card)
     {
         var data = _store.Load();
-        card.Id = data.Cards.Count == 0 ? 1 : data.Cards.Max(c => c.Id) + 1;
+
+        card.Id = GenerateNextId(data.Cards);
+
         if (data.Cards.Count == 0)
         {
             card.IsDefault = true;
